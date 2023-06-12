@@ -1,0 +1,6 @@
+# LDPlayer, Bluestacks
+emulator: LDPlayer
+
+hotkeys:
+  record_frame: '`'
+  save_run: 'y'
