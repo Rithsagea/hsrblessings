@@ -32,11 +32,7 @@ def get_rarity(img):
 # 0.25 - 0.34 "Normal enemies, Blessing 1 time(s)"
 # 0.34 - 0.5 "select blessing 1 extra time"
 
-def get_event(img, num, rarities):
-
-    if 3 in rarities:
-        return "E"  # elite
-
+def get_event(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     height, width = img.shape
     img = img[height//8:height*5//32, 0:width]
@@ -49,12 +45,12 @@ def get_event(img, num, rarities):
 
     total /= width
 
-    if total < 0.25:  # cosmos or herta
-        return "C" if num == 1 else "H"
-    elif total < 0.34:  # normal enemy
-        return "N"
-    else:  # extra blessing
-        return "EX"
+    if total < 0.25:
+        return 1
+    elif total < 0.34:
+        return 2
+    else:
+        return 3
 
 
 def get_reroll(img):
@@ -64,8 +60,7 @@ def get_reroll(img):
     return mean < 50
 
 
-def record_frame():
-    print("record frame")
+def get_frame(frameCount):
     window: pygetwindow.Win32Window = pygetwindow.getWindowsWithTitle(
         config["emulator"])[0]
     window.activate()
@@ -76,50 +71,100 @@ def record_frame():
     middle = img[height//4:height//2, width * 3 // 8:width * 5 // 8]
     right = img[height//4:height//2, width * 5 // 8:width * 7 // 8]
 
-    number = int(logText.index('end-1c').split('.')[0])
     rarities = [get_rarity(left), get_rarity(middle), get_rarity(right)]
-    event = get_event(img, number, rarities)
+    event = get_event(img)
     reroll = get_reroll(img)
 
-    count = -(rarities[0] + rarities[1] + rarities[2]) + 6
-    total = logText.get("1.0", tk.END).count("False")
-
-    logText.insert(tk.END, "{},{},{},{},{},{},{},{}\n".format(
-        number, event, reroll,
-        rarities[0], rarities[1], rarities[2],
-        count, total))
+    return rarities, reroll, event
 
 
-def save_run():
-    data = logText.get("1.0", tk.END)
-    logText.delete("1.0", tk.END)
-    file = open(
-        "data/" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".csv", "w")
-    file.write(data)
-    file.close()
+class BlessingFrame:
+    def __init__(self, rarities, reroll, event, blessing_count):
+        self.rarities = rarities
+        self.reroll = reroll
+        self.blessing_count = blessing_count
+
+        if reroll:
+            self.blessing_count -= 1
+
+        self.rarities_count = self.rarities.count(1)
+
+        if 3 in rarities:
+            self.event = "EL"  # elite
+        elif event == 1:
+            if blessing_count == 0 or (blessing_count == 1 and reroll):
+                self.event = "BC"  # blessing cosmos
+            else:
+                self.event = "HS"  # herta's shop
+        elif event == 2:
+            self.event = "NO"  # normal
+        else:
+            self.event = "EX"  # extra blessing
+
+
+class Window(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.blessing_data: list[BlessingFrame] = []
+
+        self.title("HSR Blessings Recording Tool")
+
+        self.recordButton = tk.Button(
+            self, text="Record Frame", command=self.record_frame)
+        self.recordButton.grid(row=0, column=0, padx=10, pady=10)
+
+        self.save_button = tk.Button(
+            self, text="Save Run", command=self.save_run)
+        self.save_button.grid(row=0, column=1, padx=10, pady=10)
+
+        self.log_text = tk.Text(self)
+        self.log_text.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+
+        keyboard.add_hotkey("ctrl+shift+1", self.record_frame)
+        keyboard.add_hotkey("ctrl+shift+2", self.save_run)
+
+    def update_log(self):
+        text = ""
+
+        for id, frame in enumerate(self.blessing_data):
+            text += "{},{},{},{},{},{},{},{}\n".format(
+                id + 1, frame.event, frame.reroll,
+                frame.rarities[0], frame.rarities[1], frame.rarities[2],
+                frame.rarities_count, frame.blessing_count)
+
+        self.log_text.delete("1.0", tk.END)
+        self.log_text.insert(tk.END, text)
+
+    def get_blessing_count(self):
+        blessings = 0
+        for frame in self.blessing_data:
+            if not frame.reroll and 3 not in frame.rarities:
+                blessings += 1
+        return blessings
+
+    def record_frame(self):
+        frame_count = int(self.log_text.index('end-1c').split('.')[0])
+        rarities, reroll, event = get_frame(frame_count)
+        self.blessing_data.append(BlessingFrame(rarities, reroll, event,
+                                                self.get_blessing_count()))
+        self.update_log()
+
+    def save_run(self):
+        data = self.log_text.get("1.0", tk.END)
+        self.log_text.delete("1.0", tk.END)
+        file = open(
+            "data/" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".csv", "w")
+        file.write(data)
+        file.close()
 
 
 config = yaml.safe_load(open("config.yml"))
 print(config)
 
-window = tk.Tk()
-window.title("HSR Blessings Recording Tool")
-
-recordButton = tk.Button(window, text="Record Frame", command=record_frame)
-recordButton.grid(row=0, column=0, padx=10, pady=10)
-
-saveButton = tk.Button(window, text="Save Run", command=save_run)
-saveButton.grid(row=0, column=1, padx=10, pady=10)
-
-logText = tk.Text(window)
-logText.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
-
-window.grid_columnconfigure(0, weight=1)
-window.grid_columnconfigure(1, weight=1)
-window.grid_rowconfigure(0, weight=1)
-window.grid_rowconfigure(1, weight=1)
-
-keyboard.add_hotkey(config["hotkeys"]["record_frame"], record_frame)
-keyboard.add_hotkey(config["hotkeys"]["save_run"], save_run)
-
+window = Window()
 window.mainloop()
