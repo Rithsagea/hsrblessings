@@ -81,9 +81,13 @@ def record_frame():
     event = get_event(img, number, rarities)
     reroll = get_reroll(img)
 
-    logText.insert(tk.END, "{},{},{},{},{},{}\n".format(
+    count = -(rarities[0] + rarities[1] + rarities[2]) + 6
+    total = logText.get("1.0", tk.END).count("False")
+
+    logText.insert(tk.END, "{},{},{},{},{},{},{},{}\n".format(
         number, event, reroll,
-        rarities[0], rarities[1], rarities[2]))
+        rarities[0], rarities[1], rarities[2],
+        count, total))
 
 
 def save_run():
