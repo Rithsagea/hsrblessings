@@ -1,3 +1,4 @@
+import datetime
 import keyboard
 import pyautogui
 import pygetwindow
@@ -80,13 +81,18 @@ def record_frame():
     event = get_event(img, number, rarities)
     reroll = get_reroll(img)
 
-    logText.insert(tk.END, "{}, {}, {}: {},{},{}\n".format(
+    logText.insert(tk.END, "{},{},{},{},{},{}\n".format(
         number, event, reroll,
         rarities[0], rarities[1], rarities[2]))
 
 
 def save_run():
-    print("save run")
+    data = logText.get("1.0", tk.END)
+    logText.delete("1.0", tk.END)
+    file = open(
+        "data/" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".csv", "w")
+    file.write(data)
+    file.close()
 
 
 config = yaml.safe_load(open("config.yml"))
