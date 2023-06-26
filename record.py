@@ -6,6 +6,7 @@ import yaml
 import cv2
 import numpy as np
 import tkinter as tk
+import simpleaudio as sa
 
 # grey hsv(234, 10%, 38%)
 # blue hsv(226, 50%, 47%)
@@ -102,6 +103,9 @@ class BlessingFrame:
             self.event = "EX"  # extra blessing
 
 
+sound = sa.WaveObject.from_wave_file("ding.wav")
+
+
 class Window(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -153,6 +157,7 @@ class Window(tk.Tk):
         self.blessing_data.append(BlessingFrame(rarities, reroll, event,
                                                 self.get_blessing_count()))
         self.update_log()
+        sound.play()
 
     def save_run(self):
         data = self.log_text.get("1.0", tk.END)
@@ -161,6 +166,7 @@ class Window(tk.Tk):
             "data/" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".csv", "w")
         file.write(data)
         file.close()
+        sound.play()
 
 
 config = yaml.safe_load(open("config.yml"))
