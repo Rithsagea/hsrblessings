@@ -20,7 +20,6 @@ def get_rarity(img):
     h, s, v = cv2.split(img)
     img = cv2.bitwise_and(img, img, mask=cv2.inRange(v, 20, 100))
     mean = cv2.mean(s, mask=cv2.inRange(v, 20, 100))[0]
-    print(mean)
     if mean > 90:
         return 3
     elif mean > 50:
@@ -64,7 +63,11 @@ def get_reroll(img):
 def get_frame(frameCount):
     window: pygetwindow.Win32Window = pygetwindow.getWindowsWithTitle(
         config["emulator"])[0]
-    window.activate()
+    try:
+        window.activate()
+    except:
+        print("Error focusing")
+    
     img = np.array(pyautogui.screenshot(region=window.box).convert("RGB"))
 
     height, width, channels = img.shape
@@ -103,7 +106,8 @@ class BlessingFrame:
             self.event = "EX"  # extra blessing
 
 
-sound = sa.WaveObject.from_wave_file("ding.wav")
+record_sound = sa.WaveObject.from_wave_file("record.wav")
+save_sound = sa.WaveObject.from_wave_file("save.wav")
 
 
 class Window(tk.Tk):
@@ -112,31 +116,38 @@ class Window(tk.Tk):
         self.blessing_data: list[BlessingFrame] = []
 
         self.title("HSR Blessings Recording Tool")
+        self.geometry("550x860")
 
         self.recordButton = tk.Button(
-            self, text="Record Frame", command=self.record_frame)
-        self.recordButton.grid(row=0, column=0, padx=10, pady=10)
+            self, text="Record", command=self.record)
+        self.recordButton.grid(row=0, column=0, pady=10)
+
+        self.recordButton = tk.Button(
+            self, text="Undo", command=self.undo)
+        self.recordButton.grid(row=0, column=1, pady=10)
 
         self.save_button = tk.Button(
-            self, text="Save Run", command=self.save_run)
-        self.save_button.grid(row=0, column=1, padx=10, pady=10)
+            self, text="Save", command=self.save)
+        self.save_button.grid(row=0, column=2, pady=10)
 
-        self.log_text = tk.Text(self)
-        self.log_text.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+        self.log_text = tk.Text(self, height=50, border=5)
+        self.log_text.grid(row=1, column=0, columnspan=3, sticky="S")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_rowconfigure(0, minsize=0)
 
-        keyboard.add_hotkey("ctrl+shift+1", self.record_frame)
-        keyboard.add_hotkey("ctrl+shift+2", self.save_run)
+        keyboard.add_hotkey(
+            config['hotkeys']['record_frame'], self.record)
+        keyboard.add_hotkey(config['hotkeys']['undo_record'], self.undo)
+        keyboard.add_hotkey(config['hotkeys']['save_run'], self.save)
 
     def update_log(self):
-        text = ""
+        text = "#,\tEvent,\tReroll,\tB1,\tB2,\tB3,\t1*,\tTotal\n"
 
         for id, frame in enumerate(self.blessing_data):
-            text += "{},{},{},{},{},{},{},{}\n".format(
+            text += "{},\t{},\t{},\t{},\t{},\t{},\t{},\t{}\n".format(
                 id + 1, frame.event, frame.reroll,
                 frame.rarities[0], frame.rarities[1], frame.rarities[2],
                 frame.rarities_count, frame.blessing_count)
@@ -151,22 +162,29 @@ class Window(tk.Tk):
                 blessings += 1
         return blessings
 
-    def record_frame(self):
+    def record(self):
         frame_count = int(self.log_text.index('end-1c').split('.')[0])
         rarities, reroll, event = get_frame(frame_count)
         self.blessing_data.append(BlessingFrame(rarities, reroll, event,
                                                 self.get_blessing_count()))
         self.update_log()
-        sound.play()
+        record_sound.play()
 
-    def save_run(self):
-        data = self.log_text.get("1.0", tk.END)
+    def undo(self):
+        if (len(self.blessing_data) > 0):
+            self.blessing_data.pop()
+        self.update_log()
+        record_sound.play()
+
+    def save(self):
+        data = self.log_text.get("1.0", tk.END).replace('\t', '')
         self.log_text.delete("1.0", tk.END)
         file = open(
             "data/" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + ".csv", "w")
         file.write(data)
         file.close()
-        sound.play()
+        self.blessing_data.clear()
+        save_sound.play()
 
 
 config = yaml.safe_load(open("config.yml"))

@@ -2,5 +2,6 @@
 emulator: LDPlayer
 
 hotkeys:
-  record_frame: '`'
-  save_run: 'y'
+  record_frame: 'ctrl+a'
+  undo_record: 'ctrl+z'
+  save_run: 'ctrl+s'
